@@ -7,28 +7,25 @@ namespace Kartochki
 {
     public partial class MainPage : ContentPage
     {
-        private const string FilePath = "dictionary.txt"; // Путь к файлу
+        private const string FilePath = "dictionary.txt";
+        private CarouselView carouselView;
 
         public MainPage()
         {
-            //InitializeComponent();
-
-            CarouselView carouselView = new CarouselView
+            carouselView = new CarouselView
             {
                 VerticalOptions = LayoutOptions.Center,
             };
 
-            // Проверяем наличие файла словаря и загружаем его, если существует
             List<Product> products = LoadDictionaryFromFile();
 
-            // Если файла не существует или он пустой, создаем новый список
             if (products == null)
             {
                 products = new List<Product>
                 {
-                    new Product { Name = "Vihm", Perevod = "Дождь", Image = "dotnet_bot.svg" },
-                    new Product { Name = "Päike", Perevod= "Солнце", Image = "dotnet_bot.svg" },
-                    new Product { Name = "Maa", Perevod = "Земля", Image = "dotnet_bot.svg" }
+                    new Product { Name = "Vihm", Perevod = "Дождь" },
+                    new Product { Name = "Päike", Perevod= "Солнце" },
+                    new Product { Name = "Maa", Perevod = "Земля" }
                 };
             }
 
@@ -46,13 +43,10 @@ namespace Kartochki
                 };
                 header.SetBinding(Label.TextProperty, "Name");
 
-                Image image = new Image { WidthRequest = 150, HeightRequest = 150 };
-                image.SetBinding(Image.SourceProperty, "Image");
-
                 Label perevod = new Label { HorizontalTextAlignment = TextAlignment.Center, TextColor = Color.FromHex("#000000"), Margin = 10 };
                 perevod.SetBinding(Label.TextProperty, "Perevod");
 
-                StackLayout st = new StackLayout() { header, image, perevod };
+                StackLayout st = new StackLayout() { header, perevod };
                 st.WidthRequest = 300;
                 st.HeightRequest = 300;
                 st.BackgroundColor = Color.FromHex("#ccb6b6");
@@ -61,7 +55,19 @@ namespace Kartochki
                 return frame;
             });
 
-            Content = carouselView;
+            Button addButton = new Button
+            {
+                Text = "Добавить слово",
+                HorizontalOptions = LayoutOptions.Center,
+                VerticalOptions = LayoutOptions.End,
+                Margin = new Thickness(0, 20),
+            };
+            addButton.Clicked += OnAddButtonClick;
+
+            Content = new StackLayout
+            {
+                Children = { carouselView, addButton },
+            };
         }
 
         private List<Product> LoadDictionaryFromFile()
@@ -75,9 +81,9 @@ namespace Kartochki
                     foreach (string line in lines)
                     {
                         string[] parts = line.Split(',');
-                        if (parts.Length == 3)
+                        if (parts.Length >= 2) // Проверяем, что есть хотя бы две части
                         {
-                            products.Add(new Product { Name = parts[0], Perevod = parts[1], Image = parts[2] });
+                            products.Add(new Product { Name = parts[0], Perevod = parts[1] });
                         }
                     }
                     return products;
@@ -99,7 +105,7 @@ namespace Kartochki
                 {
                     foreach (Product product in products)
                     {
-                        writer.WriteLine($"{product.Name},{product.Perevod},{product.Image}");
+                        writer.WriteLine($"{product.Name},{product.Perevod}");
                     }
                 }
             }
@@ -109,12 +115,42 @@ namespace Kartochki
             }
         }
 
-        // Метод для добавления нового слова в словарь
-        private void AddWordToDictionary(string name, string perevod, string image)
+        private async void OnAddButtonClick(object sender, EventArgs e)
+        {
+            string name = await DisplayPromptAsync("Добавить слово", "Введите слово:");
+            string perevod = await DisplayPromptAsync("Добавить слово", "Введите перевод:");
+
+            if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(perevod))
+            {
+                AddWordToDictionary(name, perevod);
+            }
+            else
+            {
+                await DisplayAlert("Ошибка", "Пожалуйста, заполните все поля.", "OK");
+            }
+        }
+        private void AddWordToDictionary(string name, string perevod)
         {
             List<Product> products = LoadDictionaryFromFile() ?? new List<Product>();
-            products.Add(new Product { Name = name, Perevod = perevod, Image = image });
+            products.Add(new Product { Name = name, Perevod = perevod });
             SaveDictionaryToFile(products);
+
+
+            if (carouselView.ItemsSource == null)
+            {
+                carouselView.ItemsSource = products;
+            }
+            else
+            {
+                List<Product> updatedProducts = carouselView.ItemsSource as List<Product>;
+                updatedProducts.Add(new Product { Name = name, Perevod = perevod });
+                carouselView.ItemsSource = updatedProducts;
+            }
         }
+
+
+
     }
+
+
 }

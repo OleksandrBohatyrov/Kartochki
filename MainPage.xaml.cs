@@ -153,7 +153,7 @@ namespace Kartochki
                     foreach (string line in lines)
                     {
                         string[] parts = line.Split(',');
-                        if (parts.Length >= 2) // Проверяем, что есть хотя бы две части
+                        if (parts.Length >= 2) 
                         {
                             products.Add(new Product { Name = parts[0], Perevod = parts[1] });
                         }

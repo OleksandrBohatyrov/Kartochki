@@ -8,10 +8,7 @@ namespace Kartochki
 {
     public partial class MainPage : ContentPage
     {
-        private const string FilePath = "dictionary.txt";
-        private CarouselView carouselView;
-        private bool isRotated = false;
-        private List<Product> products;
+        private const string FilePath = "dictionary.txt"; // Путь к файлу
 
         public MainPage()
         {
@@ -20,7 +17,21 @@ namespace Kartochki
                 VerticalOptions = LayoutOptions.Center,
             };
 
-            LoadDictionaryFromFile(); // Загрузка словаря из файла
+            // Проверяем наличие файла словаря и загружаем его, если существует
+            List<Product> products = LoadDictionaryFromFile();
+
+            // Если файла не существует или он пустой, создаем новый список
+            if (products == null)
+            {
+                products = new List<Product>
+                {
+                    new Product { Name = "Vihm", Perevod = "Дождь", Image = "dotnet_bot.svg" },
+                    new Product { Name = "Päike", Perevod= "Солнце", Image = "dotnet_bot.svg" },
+                    new Product { Name = "Maa", Perevod = "Земля", Image = "dotnet_bot.svg" }
+                };
+            }
+
+            carouselView.ItemsSource = products;
 
             carouselView.ItemTemplate = new DataTemplate(() =>
             {
@@ -38,108 +49,22 @@ namespace Kartochki
                 };
                 header.SetBinding(Label.TextProperty, "Nimi");
 
-                Label perevod = new Label
-                {
-                    HorizontalTextAlignment = TextAlignment.Center,
-                    TextColor = Color.FromHex("#000000"),
-                    VerticalOptions = LayoutOptions.Center,
-                    Margin = 10,
-                    FontSize = 20,
-                    IsVisible = false // Initially invisible
-                };
-                perevod.SetBinding(Label.TextProperty, "Tõlkida");
+                Image image = new Image { WidthRequest = 150, HeightRequest = 150 };
+                image.SetBinding(Image.SourceProperty, "Image");
 
-                StackLayout st = new StackLayout() { Children = { header, perevod }, VerticalOptions = LayoutOptions.Center, WidthRequest = 300, HeightRequest = 300, BackgroundColor = Color.FromHex("#ccb6b6") };
+                Label perevod = new Label { HorizontalTextAlignment = TextAlignment.Center, TextColor = Color.FromHex("#000000"), Margin = 10 };
+                perevod.SetBinding(Label.TextProperty, "Perevod");
+
+                StackLayout st = new StackLayout() { header, image, perevod };
+                st.WidthRequest = 300;
+                st.HeightRequest = 300;
+                st.BackgroundColor = Color.FromHex("#ccb6b6");
+                Frame frame = new Frame();
                 frame.Content = st;
-
-                frame.GestureRecognizers.Add(new TapGestureRecognizer
-                {
-                    Command = new Command(async () => await FlipCard(frame, perevod)),
-                });
-
-                frame.GestureRecognizers.Add(new TapGestureRecognizer
-                {
-                    NumberOfTapsRequired = 2,
-                    Command = new Command(async () =>
-                    {
-                        var product = (Product)frame.BindingContext;
-                        bool result = await DisplayAlert("Kinnitus", $"Kas olete kindel, et soovite kustutada sõna '{product.Name}'?", "Jah", "Ei");
-                        if (result)
-                        {
-                            RemoveWordFromDictionary(product);
-                            carouselView.ItemsSource = products;
-                        }
-                    })
-                });
-
                 return frame;
             });
 
-            Button addButton = new Button
-            {
-                Text = "Lisa sõna",
-                HorizontalOptions = LayoutOptions.Center,
-                VerticalOptions = LayoutOptions.End,
-                Margin = new Thickness(0, 20),
-            };
-            addButton.Clicked += OnAddButtonClick;
-
-            Content = new StackLayout
-            {
-                Children = { carouselView, addButton },
-            };
-        }
-
-        private async void OnAddButtonClick(object sender, EventArgs e)
-        {
-            string name = await DisplayPromptAsync("Lisa sõna", "Sisestage sõna:");
-            string perevod = await DisplayPromptAsync("Lisa sõna", "Sisestage tõlge:");
-
-            if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(perevod))
-            {
-                AddWordToDictionary(name, perevod);
-
-                // Create a copy of VisibleViews
-                List<View> visibleViewsCopy = new List<View>(carouselView.VisibleViews);
-
-                // Flip back the card after adding word
-                foreach (var item in visibleViewsCopy)
-                {
-                    Frame frame = (Frame)item;
-                    Label perevodLabel = ((StackLayout)frame.Content).Children[1] as Label;
-                    perevodLabel.IsVisible = false; // Hide translation label after adding word
-                    await FlipCard(frame, perevodLabel);
-                }
-            }
-            else
-            {
-                await DisplayAlert("Viga", "Palun täitke kõik väljad.", "OK");
-            }
-        }
-
-        private async Task FlipCard(Frame frame, Label perevodLabel)
-        {
-            if (!isRotated)
-            {
-                await frame.RotateYTo(-90, 250); // Rotate the frame to flip it
-
-                // Wait for a moment before rotating back to give a flip effect
-                await Task.Delay(100);
-
-                // Show translation label on flipped side
-                perevodLabel.IsVisible = true;
-
-                await frame.RotateYTo(0, 250); // Rotate back to original position
-                isRotated = true;
-            }
-            else
-            {
-                await frame.RotateYTo(-90, 250);
-                await Task.Delay(100);
-                perevodLabel.IsVisible = false;
-                await frame.RotateYTo(0, 250);
-                isRotated = false;
-            }
+            Content = carouselView;
         }
 
         private void LoadDictionaryFromFile()
@@ -153,15 +78,12 @@ namespace Kartochki
                     foreach (string line in lines)
                     {
                         string[] parts = line.Split(',');
-                        if (parts.Length >= 2) 
+                        if (parts.Length == 3)
                         {
-                            products.Add(new Product { Name = parts[0], Perevod = parts[1] });
+                            products.Add(new Product { Name = parts[0], Perevod = parts[1], Image = parts[2] });
                         }
                     }
-                }
-                else
-                {
-                    products = new List<Product>(); 
+                    return products;
                 }
             }
             catch (Exception ex)
@@ -202,8 +124,21 @@ namespace Kartochki
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Viga sõnastiku salvestamisel: {ex.Message}");
+                Console.WriteLine($"Ошибка при сохранении словаря: {ex.Message}");
             }
         }
+
+        // Метод для добавления нового слова в словарь
+        private void AddWordToDictionary(string name, string perevod, string image)
+        {
+            List<Product> products = LoadDictionaryFromFile() ?? new List<Product>();
+            products.Add(new Product { Name = name, Perevod = perevod, Image = image });
+            SaveDictionaryToFile(products);
+        }
+
+
+
     }
+
+
 }
